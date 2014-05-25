@@ -1,7 +1,5 @@
 package ru.usb7.db.pg_test;
 
-import com.sun.xml.internal.ws.util.StringUtils;
-
 import java.sql.*;
 
 /**
@@ -17,52 +15,6 @@ public class PgTest {
         return new String(new char[count]).replace("\0", str);
     }
 
-    //stupid realization
-    private static void generateCustomersV0(Connection connection, int count) throws SQLException {
-        for (int i = 0; i < count; i++) {
-            Statement st = connection.createStatement();
-            st.execute("insert into AUTOSERVICE_CUSTOMER (FIRST_NAME, LAST_NAME) values ('" + NameGenerator.nextFirstName() + "', '" + NameGenerator.nextLastName() + "'');");
-        }
-    }
-
-    //sql injection
-    private static void generateCustomersV1(Connection connection, int count) throws SQLException {
-        connection.setAutoCommit(false);
-        for (int i = 0; i < count; i++) {
-            Statement st = connection.createStatement();
-            st.execute("insert into AUTOSERVICE_CUSTOMER (FIRST_NAME, LAST_NAME) values ('" + NameGenerator.nextFirstName() + "', '" + NameGenerator.nextLastName() + "');");
-        }
-        connection.commit();
-    }
-
-    //without sql injections
-    private static void generateCustomersV2(Connection connection, int count) throws SQLException {
-        connection.setAutoCommit(false);
-        PreparedStatement pst = connection.prepareStatement("insert into AUTOSERVICE_CUSTOMER (FIRST_NAME, LAST_NAME) values (?, ?);");
-        for (int i = 0; i < count; i++) {
-            pst.setString(1, NameGenerator.nextFirstName());
-            pst.setString(2, NameGenerator.nextLastName());
-            pst.execute();
-        }
-        connection.commit();
-    }
-
-    //batch
-    private static void generateCustomersV3(Connection connection, int count) throws SQLException {
-        connection.setAutoCommit(false);
-        PreparedStatement pst = connection.prepareStatement("insert into AUTOSERVICE_CUSTOMER (FIRST_NAME, LAST_NAME) values (?, ?);");
-        for (int i = 0; i < count; i++) {
-            pst.setString(1, NameGenerator.nextFirstName());
-            pst.setString(2, NameGenerator.nextLastName());
-            pst.addBatch();
-            if (0 == i % 100)
-                pst.executeBatch();
-        }
-        pst.executeBatch();
-        connection.commit();
-    }
-
-    //many values in a single VALUES
     private static void generateCustomersV4(Connection connection, int count) throws SQLException {
         connection.setAutoCommit(false);
 
@@ -75,8 +27,9 @@ public class PgTest {
 
         for (int j = 0; j < bunches; j++) {
             for (int i = 0; i < 100; i++) {
-                pst.setString(2 * i + 1, NameGenerator.nextFirstName());
-                pst.setString(2 * i + 2, NameGenerator.nextLastName());
+                Customer customer = Customer.randomCustomer();
+                pst.setString(2 * i + 1, customer.firstName);
+                pst.setString(2 * i + 2, customer.lastName);
             }
             pst.addBatch();
             if (j % 100 == 0)
@@ -91,11 +44,31 @@ public class PgTest {
             query = "insert into AUTOSERVICE_CUSTOMER (FIRST_NAME, LAST_NAME) values " + repeated + ";";
             pst = connection.prepareStatement(query);
             for (int i = 0; i < modulo; i++) {
-                pst.setString(2 * i + 1, NameGenerator.nextFirstName());
-                pst.setString(2 * i + 2, NameGenerator.nextLastName());
+                Customer customer = Customer.randomCustomer();
+                pst.setString(2 * i + 1, customer.firstName);
+                pst.setString(2 * i + 2, customer.lastName);
             }
             pst.execute();
         }
+
+        connection.commit();
+    }
+
+    private static void generateAutoservices(Connection connection, int count) throws SQLException {
+        connection.setAutoCommit(false);
+
+        String query = "insert into AUTOSERVICE_AUTOSERVICE (NAME, ADDRESS) values (?, ?);";
+        PreparedStatement pst = connection.prepareStatement(query);
+
+        for (int i = 0; i < count; i++) {
+            Autoservice autoservice = Autoservice.RandomAutoservice();
+            pst.setString(1, autoservice.name);
+            pst.setString(2, autoservice.address);
+            pst.addBatch();
+            if (i % 1000 == 0)
+                pst.executeBatch();
+        }
+        pst.executeBatch();
 
         connection.commit();
     }
@@ -127,24 +100,11 @@ public class PgTest {
                 long estimatedTime;
 
                 startTime = System.nanoTime();
-                generateCustomersV1(connection, 100000);
-                estimatedTime = System.nanoTime() - startTime;
-                System.out.format("V1 done in %d ms.%n", estimatedTime / 1000000);
-
-                startTime = System.nanoTime();
-                generateCustomersV2(connection, 100000);
-                estimatedTime = System.nanoTime() - startTime;
-                System.out.format("V2 done in %d ms.%n", estimatedTime / 1000000);
-
-                startTime = System.nanoTime();
-                generateCustomersV3(connection, 100000);
-                estimatedTime = System.nanoTime() - startTime;
-                System.out.format("V3 done in %d ms.%n", estimatedTime / 1000000);
-
-                startTime = System.nanoTime();
-                generateCustomersV4(connection, 100000);
+                generateCustomersV4(connection, 100);
                 estimatedTime = System.nanoTime() - startTime;
                 System.out.format("V4 done in %d ms.%n", estimatedTime / 1000000);
+
+                generateAutoservices(connection, 10);
 
                 connection.close();
             } catch (SQLException e) {
