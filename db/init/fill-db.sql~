@@ -1,0 +1,8 @@
+insert into AUTOSERVICE_AUTOSERVICE (NAME, ADDRESS) values ("QuickFix",               "221 B Baker St, London, England");
+insert into AUTOSERVICE_AUTOSERVICE (NAME, ADDRESS) values ("Knock, Knock and done!", "11 Wall Street New York, NY");
+
+insert into AUTOSERVICE_CUSTOMER (LAST_NAME) values ("Oliver", "Hughes");
+insert into AUTOSERVICE_CUSTOMER (LAST_NAME) values ("Ethan",  "Lee");
+insert into AUTOSERVICE_CUSTOMER (LAST_NAME) values ("Cooper", "Bailey");
+
+
